@@ -5,6 +5,7 @@ from atalhos import ControleAtalhos
 from configuracoes import INDICE_CAMERA, MAO_DO_CURSOR
 from cursor import ControleCursor
 from detector import desenharMaos, detectarMaos, fecharDetector
+from duasmaos import ControleDuasMaos
 from janela import JanelaCamera
 
 pyautogui.PAUSE = 0
@@ -61,6 +62,25 @@ def processarMaoSecundaria(maosEncontradas, atalhos, janela, quadro):
     janela.escreverTexto(quadro, f"Atalhos: {texto}", (20, 75), cor)
 
 
+def processarDuasMaos(maosEncontradas, duasMaos, cursor, atalhos, janela, quadro):
+    if atalhos.pausado:
+        duasMaos.zerar()
+        return False
+
+    resultado = duasMaos.controlar(maosEncontradas)
+
+    if resultado is None:
+        return False
+
+    # enquanto o gesto das duas maos esta ativo, cursor e atalhos ficam parados
+    cursor.maoSumiu()
+    atalhos.maoSumiu()
+
+    texto, cor = resultado
+    janela.escreverTexto(quadro, texto, (20, 40), cor)
+    return True
+
+
 def iniciar():
     webcam = abrirWebcam()
 
@@ -70,6 +90,7 @@ def iniciar():
 
     cursor = ControleCursor()
     atalhos = ControleAtalhos()
+    duasMaos = ControleDuasMaos()
     janela = JanelaCamera()
 
     try:
@@ -84,8 +105,9 @@ def iniciar():
 
             desenharMaos(quadro, maosEncontradas)
 
-            processarMaoDoCursor(maosEncontradas, cursor, atalhos, janela, quadro)
-            processarMaoSecundaria(maosEncontradas, atalhos, janela, quadro)
+            if not processarDuasMaos(maosEncontradas, duasMaos, cursor, atalhos, janela, quadro):
+                processarMaoDoCursor(maosEncontradas, cursor, atalhos, janela, quadro)
+                processarMaoSecundaria(maosEncontradas, atalhos, janela, quadro)
 
             janela.atualizar(quadro, atalhos.cameraVisivel)
 

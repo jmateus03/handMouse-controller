@@ -9,13 +9,15 @@ from configuracoes import (
     BRANCO,
     CINZA,
     LIMITE_PINCA,
+    MAXIMO_ROLAGEM,
     MOVIMENTO_MINIMO,
     TEMPO_ENTRE_ATALHOS,
     TEMPO_PARA_PAUSAR,
     VELOCIDADE_DESLIZE,
-    VELOCIDADE_ROLAGEM,
+    VELOCIDADE_ROLAGEM_CONTINUA,
     VELOCIDADE_ZOOM,
     VERMELHO,
+    ZONA_MORTA_ROLAGEM,
 )
 from detector import dedosLevantados, proporcaoPinca
 
@@ -83,21 +85,32 @@ class ControleAtalhos:
             self.cameraVisivel = not self.cameraVisivel
         return "CAMERA", AZUL_CLARO
 
-    def tratarRolagemOuZoom(self, gesto, posicaoY):
+    def tratarRolagem(self, posicaoY):
+        if self.yReferencia is None:
+            self.yReferencia = posicaoY
+        diferencaY = posicaoY - self.yReferencia
+
+        if abs(diferencaY) > ZONA_MORTA_ROLAGEM:
+            # so conta o que passou da zona morta, para a rolagem comecar suave
+            excesso = abs(diferencaY) - ZONA_MORTA_ROLAGEM
+            quantidade = min(excesso * VELOCIDADE_ROLAGEM_CONTINUA, MAXIMO_ROLAGEM)
+            sentido = -1 if diferencaY > 0 else 1
+            pyautogui.scroll(int(sentido * quantidade))
+
+        return "ROLAGEM CONTINUA", AMARELO
+
+    def tratarZoom(self, posicaoY):
         if self.yReferencia is None:
             self.yReferencia = posicaoY
         diferencaY = posicaoY - self.yReferencia
 
         if abs(diferencaY) > MOVIMENTO_MINIMO:
-            if gesto == "rolagem":
-                pyautogui.scroll(int(-diferencaY * VELOCIDADE_ROLAGEM))
-            else:
-                pyautogui.keyDown("ctrl")
-                pyautogui.scroll(int(-diferencaY * VELOCIDADE_ZOOM))
-                pyautogui.keyUp("ctrl")
+            pyautogui.keyDown("ctrl")
+            pyautogui.scroll(int(-diferencaY * VELOCIDADE_ZOOM))
+            pyautogui.keyUp("ctrl")
             self.yReferencia = posicaoY
 
-        return ("ROLAGEM" if gesto == "rolagem" else "ZOOM"), AMARELO
+        return "ZOOM", AMARELO
 
     def tratarAlternarJanela(self, horaAtual):
         if self.atalhoLiberado("alternar_janela", horaAtual):
@@ -139,8 +152,11 @@ class ControleAtalhos:
         if self.pausado:
             return "PAUSADO", VERMELHO
 
-        if gesto in ("rolagem", "zoom"):
-            return self.tratarRolagemOuZoom(gesto, posicaoY)
+        if gesto == "rolagem":
+            return self.tratarRolagem(posicaoY)
+
+        if gesto == "zoom":
+            return self.tratarZoom(posicaoY)
 
         if gesto == "alternar_janela":
             return self.tratarAlternarJanela(horaAtual)
